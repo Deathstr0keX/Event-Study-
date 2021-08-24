@@ -1,0 +1,96 @@
+import matplotlib.pyplot as plt # plotting
+import numpy as np # linear algebra
+import os # accessing directory structure
+import pandas as pd 
+import datetime
+import re
+
+
+df1 = pd.read_csv('~/Desktop/All_Posts+Comments.csv', delimiter=',')
+df1.dataframeName = 'All_P+C.csv'
+nRow, nCol = df1.shape
+print(f'There are {nRow} rows and {nCol} columns')
+df1
+
+#Analyzing for all social media activity
+df1a=df1[df1['body'].str.contains('gme|gamestop|amc|bb|blackberry|nok|nokia|silver|slv|naked|nakd|brand|expr|retailer|bbby|bed|bath|beyond', flags=re.IGNORECASE, regex=True, na=False)]
+df1a
+
+df1a["datetime"] = df1a["datetime"].astype("datetime64")
+df1a['datetime'].groupby([df1a["datetime"].dt.year, 
+                          df1a["datetime"].dt.month, 
+                          df1a["datetime"].dt.day]).count().plot(kind="bar")
+                          
+
+
+
+#Analyzing for Bot Activity
+#Need to split dataframe into 2, one with bot commments and one without. 
+#Split it based on whether or not a comment is duplicated by the same author
+df2 = df1[['author','body']]
+df2
+
+df3 = df2.groupby(df2.columns.tolist()).size().reset_index().rename(columns={0:'records'})
+df3
+
+#If the same comment/post is duplicated by the same author more than 10 times, it is a bot
+df4 = df3.loc[df3['records'] > 10]
+df4
+
+#Need to filter out deleted and removed comments by automods
+df5= df3.loc[df3['records'] > 10].loc[df3['author'] != 'AutoModerator']
+df5
+
+#Isolating comments/posts that mention a particular stock
+df6=df5[df5['body'].str.contains('gme|gamestop|amc|bb|blackberry|nok|nokia|silver|slv|naked|nakd|brand|expr|retailer|bbby|bed|bath|beyond', flags=re.IGNORECASE, regex=True)]
+df6
+
+keys = list(df6.columns.values)
+keys = keys[:2]
+
+#Locating all the rows in OG dataframe that could potentially be bots based on duplicates by the same author
+i1 = df1.set_index(keys).index
+i2 = df6.set_index(keys).index
+df7 = df1[i1.isin(i2)]
+df7
+
+df7["datetime"] = df7["datetime"].astype("datetime64")
+df7['datetime'].groupby([df7["datetime"].dt.year, 
+                         df7["datetime"].dt.month, 
+                         df7["datetime"].dt.day]).count().plot(kind="bar")
+      
+      
+
+
+
+#Find (bot post per day / total post per day) for each stock, to see the relative significance of the bot posts
+df1a['date'] = pd.to_datetime(df1a['datetime']).dt.date
+df7['date'] = pd.to_datetime(df7['datetime']).dt.date
+
+newdf1a = df1a.groupby('date').count()
+newdf7 = df7.groupby('date').count()
+
+newdf1a = newdf1a[['datetime']]
+newdf7 = newdf7[['datetime']]
+
+combined = pd.concat([newdf1a, newdf7], keys=['newdf1a', 'newdf7'], axis=1)
+new=combined.fillna(0)
+divide = new['newdf7']/new['newdf1a']
+divide.plot(kind="bar")
+
+
+
+
+
+#average upvote for a bot comment/post mentioning meme stocks
+df7['score'].describe()
+df1["score"].describe()
+
+
+
+#number of bot comments that have upvotes higher than the average
+df7.loc[df7['score'] > 8]
+
+    
+
+
